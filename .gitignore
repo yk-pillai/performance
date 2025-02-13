@@ -1,0 +1,19 @@
+# Root level
+node_modules
+.env
+.DS_Store # For macOS
+*.swp  # Swap files
+*.log  # Log files
+.dockerignore # If you have one
+
+# Client
+client/node_modules
+client/.env
+client/build
+client/dist
+
+# Server
+server/node_modules
+server/.env
+server/build
+server/dist

@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  client:
+    build:
+      context: ./client # Path to frontend directory
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"  # Expose client on port 3000
+    volumes:
+      - ./client:/usr/src/app
+      - /usr/src/app/node_modules
+    environment:
+      VITE_API_URL: http://localhost:5000/api  # API URL for frontend to access backend
+
+  server:
+    build:
+      context: ./server # Path to backend directory
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"  # Expose server on port 5000
+    volumes:
+      - ./server:/usr/src/app
+      - /usr/src/app/node_modules
+    environment:
+      DATABASE_URL: postgres://yk:postgresql@db:5432/performance # Connection to DB container
+
+  db:
+    image: postgres:15
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql  # Mount init.sql to run on DB initialization
+    environment:
+      POSTGRES_USER: yk
+      POSTGRES_PASSWORD: postgresql
+      POSTGRES_DB: performance
+    ports:
+    - "5432:5432"
+
+volumes:
+  postgres-data:
