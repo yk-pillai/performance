@@ -28,7 +28,7 @@ jobs:
 
       - name: install node modules
         run: |
-          npm ci
+          npm i
 
       - name: build
         run: |
