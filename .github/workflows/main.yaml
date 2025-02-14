@@ -24,7 +24,7 @@ jobs:
         uses: actions/checkout@v3
       
       - name: Change directory to client 
-        run: cd client
+        run: cd client/ && ls -a
 
       - name: install node modules
         run: |
