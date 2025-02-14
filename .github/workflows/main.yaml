@@ -22,17 +22,14 @@ jobs:
     steps:
       - name: Checkout code 
         uses: actions/checkout@v3
-      
-      - name: Change directory to client 
-        run: cd client/ && ls -a
 
       - name: install node modules
         run: |
-          npm i
+          npm ci --prefix client
 
       - name: build
         run: |
-          npm run build
+          npm run build --prefix client
 
       - name: configure aws credentials
         uses: aws-actions/configure-aws-credentials@v2
@@ -47,7 +44,7 @@ jobs:
 
       - name: Deploy to AWS S3
         run: |
-          npm run deploy-aws
+          aws s3 sync ./client/dist/ s3://performance-frontend/ --delete --metadata "Cache-Control=public, max-age=3600, s-maxage=86400" --exclude "*.map"
 
       - name: CF cache invalidation
         run: |
