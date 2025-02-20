@@ -2,67 +2,57 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import EyeIcon from "./EyeIcon";
 import HeartIcon from "./HeartIcon";
-import { getApiLimit } from "../utils";
-import { ARTICLE, FETCH_MULTIPLYER } from "../constants";
+import { getApiLimit, preloadImage, timeAgo } from "../utils";
+import {
+  API_BACKEND_URL,
+  ARTICLE,
+  ASSETS_BACKEND_URL,
+  FETCH_MULTIPLYER,
+} from "../constants";
 import UpArrowIcon from "./UpArrowIcon";
 import SmoothScrollLink from "./SmoothScrollLink";
-
-export interface Article {
-  id: string;
-  title: string;
-  summary: string;
-  likes: string;
-  views: string;
-  image_url: string;
-  timestamp: string;
-}
+import { ArticleT } from "../types";
 
 const ArticleList = () => {
-  const [articles, setArticles] = useState<Article[]>([]);
-  const [displayedArticles, setDisplayedArticles] = useState<Article[]>([]);
+  const [articles, setArticles] = useState<ArticleT[]>([]);
+  const [displayedArticles, setDisplayedArticles] = useState<ArticleT[]>([]);
   const { pathname } = useLocation();
+  const path = pathname.split("/");
+  const catId = path[path.length - 1];
   const limit = getApiLimit(ARTICLE, window.innerWidth);
   const showLimit = (limit / FETCH_MULTIPLYER) * 2;
   const observerRef = useRef<IntersectionObserver | null>(null);
 
-
-  const getArticles = async (cursor: null | string = null)=> {
-    const path = pathname.split("/");
+  const getArticles = async (
+    catId: string,
+    limit: number,
+    cursor: null | string = null
+  ) => {
     try {
       const data = await fetch(
-        `http://localhost:5000/api/articles/${
-          path[path.length - 1]
-        }?limit=${limit}&cursor=${cursor ?? ""}`
+        `${API_BACKEND_URL}/articles/${catId}?limit=${limit}&cursor=${
+          cursor ?? ""
+        }`
       );
       const res = await data.json();
-
-      const combinedArticles = [...articles, ...res.articles];
-
-      if (combinedArticles.length > 0) {
-        const numToPreload = limit / FETCH_MULTIPLYER;
-        for (let i = 0; i < numToPreload; i++) {
-          const link = document.createElement("link");
-          link.rel = "preload";
-          link.as = "image";
-          link.href = `http://localhost:5000${combinedArticles[i].image_url}`;
-          document.head.appendChild(link);
-        }
-      }
-
-      setArticles(combinedArticles);
-      setDisplayedArticles((prev) => [
-        ...prev,
-        ...combinedArticles.slice(prev.length, prev.length + showLimit),
-      ]);
+      return res.articles;
     } catch (err) {
       console.error(err);
     }
-  }
+  };
 
-  const pullArticlesFromState: IntersectionObserverCallback = ([entry]) => {
+  const pullArticlesFromState: IntersectionObserverCallback = async ([
+    entry,
+  ]) => {
     if (entry.isIntersecting && displayedArticles.length !== articles.length) {
       if (displayedArticles.length + showLimit >= articles.length) {
-        getArticles(articles[articles.length - 1].timestamp);
+        const res = await getArticles(
+          catId,
+          limit,
+          articles[articles.length - 1].timestamp
+        );
+        const combinedArticles = [...articles, ...res];
+        manageDisplayedArticles(combinedArticles);
       } else {
         setDisplayedArticles((prev) => [
           ...prev,
@@ -70,6 +60,14 @@ const ArticleList = () => {
         ]);
       }
     }
+  };
+
+  const manageDisplayedArticles = (combinedArticles: ArticleT[]) => {
+    setArticles(combinedArticles);
+    setDisplayedArticles((prev) => [
+      ...prev,
+      ...combinedArticles.slice(prev.length, prev.length + showLimit),
+    ]);
   };
 
   useEffect(() => {
@@ -90,9 +88,20 @@ const ArticleList = () => {
     };
   }, [displayedArticles]);
 
-
   useEffect(() => {
-    getArticles();
+    async function getInitialArticles() {
+      const res = await getArticles(catId, limit);
+      const combinedArticles = [...articles, ...res];
+
+      if (combinedArticles.length > 0) {
+        const numToPreload = limit / FETCH_MULTIPLYER;
+        for (let i = 0; i < numToPreload; i++) {
+          preloadImage(`${ASSETS_BACKEND_URL}${combinedArticles[i].image_url}`);
+        }
+      }
+      manageDisplayedArticles(combinedArticles);
+    }
+    getInitialArticles();
   }, []);
 
   if (!displayedArticles.length) {
@@ -100,7 +109,7 @@ const ArticleList = () => {
   }
   return (
     <div className="article-list grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3 sm:gap-6">
-      {displayedArticles.map((article: Article) => (
+      {displayedArticles.map((article: ArticleT) => (
         <Link
           to={`/article/${article.id}`}
           state={{ title: article.title }}
@@ -134,6 +143,7 @@ const ArticleList = () => {
                   <HeartIcon className="h-5 w-5 text-white" />
                   <span className="text-red-500">{article.likes}</span>
                 </div>
+                <div>{timeAgo(article.timestamp)}</div>
               </div>
             </div>
           </div>

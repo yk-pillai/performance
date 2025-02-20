@@ -2,6 +2,7 @@ import { useLocation } from "react-router-dom";
 import useMetaDescription from "../hooks/useMetaDescription";
 import { ARTICLE, CATEGORY } from "../constants";
 import useGetPage from "../hooks/useGetPage";
+import HorizontalRule from "./HorizontalRule";
 
 const getMetaDescription = (path: string, title: string) => {
   if (path === CATEGORY) {
@@ -19,9 +20,9 @@ const Title = () => {
   useMetaDescription(getMetaDescription(path, title));
 
   return (
-    <div className="mb-3 sm:mb-6">
+    <div className="">
       <h2 className="text-2xl font-semibold">{title}</h2>
-      <hr className="mt-1 border-gray-300" />
+      <HorizontalRule/>
     </div>
   );
 };

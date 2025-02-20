@@ -1,13 +1,9 @@
 import { Link, useLocation } from "react-router-dom";
-import { ANY, ARTICLE, CATEGORY } from "../constants";
+import { ANY, API_BACKEND_URL, ARTICLE, CATEGORY } from "../constants";
 import { useSearchContext } from "../context/SearchContext";
 import { useEffect, useRef, useState } from "react";
 import useGetPage from "../hooks/useGetPage";
-
-interface SearchResultType {
-  id: string;
-  title: string;
-}
+import { SearchResultType } from "../types/searchResult";
 
 const Search = () => {
   const { state } = useLocation();
@@ -22,15 +18,15 @@ const Search = () => {
   const timeOutRef = useRef<number>(undefined);
 
   useEffect(() => {
-    if(search===""){
-      setSearchResult([])
-      return
+    if (search === "") {
+      setSearchResult([]);
+      return;
     }
     if ([ARTICLE, CATEGORY].includes(type)) {
       async function getSearchedResult() {
         try {
           const data = await fetch(
-            `http://localhost:5000/api/articles/s/${categoryId}?limit=${limit}&term=${search}`
+            `${API_BACKEND_URL}/articles/s/${categoryId}?limit=${limit}&term=${search}`
           );
           const res = await data.json();
           setSearchResult(res.articles);
@@ -46,7 +42,12 @@ const Search = () => {
     return () => {
       clearTimeout(timeOutRef.current);
     };
-  }, [search]);
+  }, [search, categoryId, type]);
+
+  const handleClick = () => {
+    setSearchResult([]);
+    setSearch('');
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearch(e.target.value);
@@ -90,6 +91,7 @@ const Search = () => {
                     className="hover:bg-gray-200 rounded-md p-2"
                     onFocus={handleOnFocus}
                     onBlur={handleOnBlur}
+                    onClick={handleClick}
                   >
                     {r.title}
                   </Link>

@@ -26,7 +26,11 @@ const SmoothScrollLink: React.FC<SmoothScrollLinkProps> = ({
       };
     }
   }, [href]);
-  return <a href={href}>{children}</a>;
+  return (
+    <a href={href} aria-label="Move to top">
+      {children}
+    </a>
+  );
 };
 
 export default SmoothScrollLink;

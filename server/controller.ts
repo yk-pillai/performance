@@ -1,6 +1,6 @@
 import pool from "./db";
 import { Request, Response } from "express";
-import { z } from "zod";
+import { ZodError, z } from "zod";
 
 const ANY = "00000000-0000-0000-0000-000000000000";
 
@@ -31,7 +31,7 @@ const searchSchema = z.object({
 });
 
 const getArticlesParams = z.object({
-  catId: z.string().uuid({ message: "Invalid category id." }),
+  id: z.string().uuid({ message: "Invalid category id." }),
 });
 
 export const getAllCategories = async (_req: Request, res: Response) => {
@@ -45,16 +45,45 @@ export const getAllCategories = async (_req: Request, res: Response) => {
   }
 };
 
-export const getArticles = async (req: Request, res: Response) => {
-  console.log(req.query);
+export const getArticle = async (req: Request, res: Response) => {
   try {
+    console.log(req.params)
+    const params = getArticlesParams.parse(req.params);
+    const { id } = params;
+    const result = await pool.query(
+      `select art.*,TO_CHAR(art.timestamp, 'DD/MM/YYYY, HH12:MI:SS AM') AS timestamp,i.image_url, count(distinct l.session_id) as likes, count(distinct v.session_id) as views
+      from articles art 
+      inner join article_types type on art.id = type.article_id 
+      left join likes l on art.id = l.article_id 
+      left join views v on art.id = v.article_id 
+      left join images i on art.id = i.article_id
+      where art.id=$1 AND i.image_type = 'hero'
+      group by art.id, i.image_url;
+        `,
+      [id]
+    );
+    const article = result.rows;
+    res.status(200).json({ article });
+  } catch (e) {
+    if (e instanceof z.ZodError) {
+      res.status(400).json({ error: e.errors[0].message });
+    } else {
+      console.error("Database Error:", e); // Log the actual error on the server
+      res.status(500).json({ error: "Failed to fetch article" }); // Generic message for the client
+    }
+  }
+};
+
+export const getArticles = async (req: Request, res: Response) => {
+  try {
+    console.log(req.query)
     const pagination = paginationSchema.parse(req.query);
     const params = getArticlesParams.parse(req.params);
     const paraQuery = [];
     const { cursor = null, limit = 12 } = pagination;
     paraQuery.push(cursor, limit);
-    const { catId } = params;
-    const any = catId === ANY ? true : paraQuery.push(catId) && false;
+    const { id } = params;
+    const any = id === ANY ? true : paraQuery.push(id) && false;
 
     // Fetch articles with pagination using the cursor
     const result = await pool.query(
@@ -98,11 +127,11 @@ export const getArticlesForSearch = async (req: Request, res: Response) => {
     const { term = "", limit = 5 } = pagination;
     if (term === "") {
       res.json({ articles: [] });
-      return
+      return;
     }
     paraQuery.push(`%${term}%`, limit);
-    const { catId } = params;
-    const any = catId === ANY ? true : paraQuery.push(catId) && false;
+    const { id } = params;
+    const any = id === ANY ? true : paraQuery.push(id) && false;
 
     const result = await pool.query(
       `select art.id, art.title
