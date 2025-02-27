@@ -24,6 +24,9 @@ services:
       - /usr/src/app/node_modules
     environment:
       DATABASE_URL: postgres://yk:postgresql@db:5432/performance # Connection to DB container
+    depends_on:
+      - db
+      - redis
 
   db:
     image: postgres:15
@@ -36,6 +39,11 @@ services:
       POSTGRES_DB: performance
     ports:
     - "5432:5432"
+  
+  redis:
+    image: 'redis:alpine'
+    ports:
+      - '6379:6379'
 
 volumes:
   postgres-data:

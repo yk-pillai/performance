@@ -32,7 +32,9 @@ const ArticleList = () => {
       const data = await fetch(
         `${API_BACKEND_URL}/articles/${catId}?limit=${limit}&cursor=${
           cursor ?? ""
-        }`
+        }`,{
+          credentials: "include",
+        }
       );
       const res = await data.json();
       return res.articles;
@@ -136,12 +138,12 @@ const ArticleList = () => {
               {/* Views & Likes */}
               <div className="flex justify-around items-center text-sm mt-3">
                 <div className="flex items-center gap-1">
-                  <EyeIcon className="h-6 w-6 text-white" stroke="dodgerblue" />
-                  <span className="text-blue-800">{article.views}</span>
-                </div>
-                <div className="flex items-center gap-1">
                   <HeartIcon className="h-5 w-5 text-white" />
                   <span className="text-red-500">{article.likes}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <EyeIcon className="h-6 w-6 text-white" stroke="dodgerblue" />
+                  <span className="text-blue-800">{article.views}</span>
                 </div>
                 <div>{timeAgo(article.timestamp)}</div>
               </div>

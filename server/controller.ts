@@ -1,40 +1,19 @@
 import pool from "./db";
 import { Request, Response } from "express";
-import { ZodError, z } from "zod";
+import { z } from "zod";
+import { ANY, JWT_SECRET_KEY } from "./constants";
+import {
+  getArticlesParams,
+  paginationSchema,
+  searchSchema,
+  likeArticleSchema,
+  LikeArticle,
+} from "./zodSchemas";
+import { DatabaseError } from "pg";
+import jwt from "jsonwebtoken";
+import bcrypt from "bcryptjs";
 
-const ANY = "00000000-0000-0000-0000-000000000000";
-
-const paginationSchema = z.object({
-  cursor: z.preprocess(
-    (arg) => (arg === "" ? null : arg),
-    z
-      .string()
-      .nullable()
-      .refine(
-        (val) => {
-          if (val === null) return true;
-          const timestamp = new Date(val);
-          return !isNaN(timestamp.getTime());
-        },
-        {
-          message: "Invalid cursor format. Must be a valid ISO 8601 timestamp.",
-        }
-      )
-      .optional()
-  ),
-  limit: z.coerce.number({ message: "The limit is invalid." }).optional(),
-});
-
-const searchSchema = z.object({
-  term: z.string(),
-  limit: z.coerce.number({ message: "The limit is invalid." }).optional(),
-});
-
-const getArticlesParams = z.object({
-  id: z.string().uuid({ message: "Invalid category id." }),
-});
-
-export const getAllCategories = async (_req: Request, res: Response) => {
+export const getAllCategories = async (req: Request, res: Response) => {
   try {
     const result = await pool.query("select * from types;");
     const categories = result.rows;
@@ -47,11 +26,11 @@ export const getAllCategories = async (_req: Request, res: Response) => {
 
 export const getArticle = async (req: Request, res: Response) => {
   try {
-    console.log(req.params)
+    console.log(req.params);
     const params = getArticlesParams.parse(req.params);
     const { id } = params;
     const result = await pool.query(
-      `select art.*,TO_CHAR(art.timestamp, 'DD/MM/YYYY, HH12:MI:SS AM') AS timestamp,i.image_url, count(distinct l.session_id) as likes, count(distinct v.session_id) as views
+      `select art.*,TO_CHAR(art.timestamp, 'DD/MM/YYYY, HH12:MI:SS AM') AS timestamp,i.image_url, count(distinct l.user_id) as likes, COUNT(DISTINCT CASE WHEN v.user_id IS NOT NULL THEN v.user_id::TEXT ELSE v.client_uuid::TEXT END) AS views
       from articles art 
       inner join article_types type on art.id = type.article_id 
       left join likes l on art.id = l.article_id 
@@ -76,7 +55,7 @@ export const getArticle = async (req: Request, res: Response) => {
 
 export const getArticles = async (req: Request, res: Response) => {
   try {
-    console.log(req.query)
+    console.log(req.query);
     const pagination = paginationSchema.parse(req.query);
     const params = getArticlesParams.parse(req.params);
     const paraQuery = [];
@@ -87,7 +66,7 @@ export const getArticles = async (req: Request, res: Response) => {
 
     // Fetch articles with pagination using the cursor
     const result = await pool.query(
-      `select art.id, art.title, art.summary,art.timestamp, i.image_url, count(distinct l.session_id) as likes, count(distinct v.session_id) as views
+      `select art.id, art.title, art.summary,art.timestamp, i.image_url, count(distinct l.user_id) as likes, COUNT(DISTINCT CASE WHEN v.user_id IS NOT NULL THEN v.user_id::TEXT ELSE v.client_uuid::TEXT END) AS views
         from articles art 
         inner join article_types type on art.id = type.article_id 
         left join likes l on art.id = l.article_id 
@@ -154,5 +133,67 @@ export const getArticlesForSearch = async (req: Request, res: Response) => {
       console.error("Database Error:", error); // Log the actual error on the server
       res.status(500).json({ error: "Failed to fetch articles" }); // Generic message for the client
     }
+  }
+};
+
+export const likeArticle = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    if ((req as any).user) {
+      const likeData: LikeArticle = likeArticleSchema.parse(req.body);
+      const { artId, sessionId } = likeData;
+      await pool.query(
+        `
+      INSERT INTO likes (article_id, session_id) VALUES ($1,$2)
+    `,
+        [artId, sessionId]
+      );
+      res.status(201).json({ message: "Liked the article." });
+    } else {
+      res.status(401).json({ error: "Authentication required." });
+    }
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ error: error.errors[0].message });
+    } else if (error instanceof DatabaseError && error.code === "23505") {
+      res.status(409).json({ error: "Like already exists" });
+    } else {
+      res.status(500).json({ error: "Failed to add like." });
+    }
+  }
+};
+
+export const login = async (req: Request, res: Response):Promise<any> => {
+  const { email, password } = req.body;
+  try {
+    // const user = await db.query("SELECT * FROM users WHERE email = $1", [
+    //   email,
+    // ]);
+
+    if (email !== "yedhu.pillai3@gmail.com") {
+      return res.status(401).json({ error: "Invalid email or password." });
+    }
+
+    const passwordMatch = await bcrypt.compare(
+      password,
+      "$2b$10$pWXQjFuZ0FpGdqsKGrIl1.5Tn5JnbYyFPNBs9uj0CiEpsEbd8nlUy"
+    );
+
+    await new Promise((res) => setTimeout(res,2000))
+
+    if (!passwordMatch) {
+      return res.status(401).json({ error: "Invalid email or password." });
+    }
+    const user = { email: email };
+    const token = jwt.sign(user, JWT_SECRET_KEY, {
+      expiresIn: "1h",
+      algorithm: "HS256",
+    });
+    return res.json({ message: "Login successful.", token });
+  } catch (error) {
+    console.error("Login error:", error);
+    return res.status(500).json({ error: "Internal server error." });
   }
 };

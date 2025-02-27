@@ -46,7 +46,7 @@ const Search = () => {
 
   const handleClick = () => {
     setSearchResult([]);
-    setSearch('');
+    setSearch("");
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {

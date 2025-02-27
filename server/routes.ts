@@ -1,11 +1,21 @@
-import { getAllCategories, getArticles, getArticlesForSearch, getArticle } from './controller'
+import {
+  getAllCategories,
+  getArticles,
+  getArticlesForSearch,
+  getArticle,
+  likeArticle,
+  login,
+} from "./controller";
 import express from "express";
+import { authenticateToken } from "./middlewares/jwtAuthMiddleware";
 
 const router = express.Router();
 
-router.get('/categories', getAllCategories)
-router.get('/articles/:id', getArticles);
-router.get('/articles/s/:id', getArticlesForSearch);
-router.get('/article/:id', getArticle);
+router.get("/categories", getAllCategories);
+router.get("/articles/:id", getArticles);
+router.get("/articles/s/:id", getArticlesForSearch);
+router.get("/article/:id", getArticle);
+router.post("/article/like", authenticateToken, likeArticle);
+router.post("/login", login);
 
-export default router
+export default router;

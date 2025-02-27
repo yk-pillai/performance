@@ -1,8 +1,14 @@
-import fs from 'fs'
-import { Pool } from "pg";
-import {faker} from '@faker-js/faker'
-import sharp from 'sharp';
-import path from 'path';
+import fs from "fs";
+import pg from "pg"; // Import the default export
+const { Pool } = pg;
+import { faker } from "@faker-js/faker";
+import sharp from "sharp";
+import path, { dirname } from "path";
+import bcrypt from "bcryptjs";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 // Setup PostgreSQL connection
 const pool = new Pool({
@@ -22,15 +28,16 @@ fs.mkdirSync(imagePathHero, { recursive: true });
 fs.mkdirSync(imagePathListing, { recursive: true });
 
 // Generate data and save images
-const generateData = async (numArticles = 1000) => {
+const generateData = async (numArticles = 500) => {
   // Arrays to hold the data for COPY
   const articleData = [];
   const imageData = [];
   const viewData = [];
   const likeData = [];
-  const sessionData = [];
   const articleTypeData = [];
-  const { rows: types } = await pool.query(`select id from types`);
+  const userData = [];
+  const users = [];
+  const { rows: types } = await pool.query(`SELECT id FROM types`);
 
   // Get random tags
   const getRandomTags = (types, limit) => {
@@ -40,6 +47,20 @@ const generateData = async (numArticles = 1000) => {
     }
     return randomTags;
   };
+
+  // Generate User Data
+  for (let u = 0; u < 50; u++) {
+    const password = "password"; //faker.internet.password();
+    const hashedPassword = await bcrypt.hash(password, 10); // Hash the password
+    const userId = faker.string.uuid();
+    users.push(userId);
+    userData.push({
+      id: userId,
+      username: faker.internet.username(),
+      email: faker.internet.email(),
+      password_hash: hashedPassword, // Store the hashed password
+    });
+  }
 
   for (let i = 0; i < numArticles; i++) {
     const articleId = faker.string.uuid();
@@ -55,7 +76,7 @@ const generateData = async (numArticles = 1000) => {
       summary,
     });
 
-    //Generate article type data
+    // Generate article type data
     const tags = getRandomTags(types, Math.ceil(Math.random() * 5));
     for (let tag of tags) {
       articleTypeData.push({
@@ -68,8 +89,15 @@ const generateData = async (numArticles = 1000) => {
     const heroImageName = `hero_${articleId}.jpg`;
     const listingImageName = `listing_${articleId}.jpg`;
 
-    await generateImage(heroImageName, imagePathHero, 1200, 600, title); // Hero image (1200x600)
-    await generateImage(listingImageName, imagePathListing, 400, 300, title); // Listing image (400x300)
+    // Generate random RGB color values
+    const randomColor = {
+      r: Math.floor(Math.random() * 256),
+      g: Math.floor(Math.random() * 256),
+      b: Math.floor(Math.random() * 256),
+    };
+
+    await generateImage(heroImageName, imagePathHero, 1200, 600, title, randomColor); // Hero image (1200x600)
+    await generateImage(listingImageName, imagePathListing, 400, 300, title, randomColor); // Listing image (400x300)
 
     // Add image data for COPY
     imageData.push({
@@ -85,24 +113,33 @@ const generateData = async (numArticles = 1000) => {
       image_type: "listing",
     });
 
-    // Generate session data for views and likes
-    const sessCount = Math.ceil(Math.random() * 10);
-    for (let i = 0; i < sessCount; i++) {
-      const sessionId = faker.string.uuid();
-      sessionData.push({
-        id: sessionId,
-      });
-      // Add views and likes for this article (randomly choose sessions)
-      viewData.push({
-        article_id: articleId,
-        session_id: sessionId,
-      });
-      // just to make likes lesser than views
-      if (i % 2) {
-        likeData.push({
+    // Generate view and like data (with user_id and client_uuid)
+    const viewCount = Math.ceil(Math.random() * 10);
+    const generatedViews = new Set(); // Track generated views
+
+    for (let j = 0; j < viewCount; j++) {
+      const user =
+        Math.random() < 0.5 && users.length > 0
+          ? users[Math.floor(Math.random() * users.length)]
+          : null;
+      const clientUuid = user === null ? faker.string.uuid() : null; // client_uuid only if user is null
+      const viewKey = user
+        ? `${articleId}-${user}`
+        : `${articleId}-${clientUuid}`; // Create a unique key
+
+      if (!generatedViews.has(viewKey)) {
+        generatedViews.add(viewKey); // Add to the set
+        viewData.push({
           article_id: articleId,
-          session_id: sessionId,
+          user_id: user,
+          client_uuid: clientUuid,
         });
+        if (user !== null && j % 2 === 0) {
+          likeData.push({
+            article_id: articleId,
+            user_id: user,
+          });
+        }
       }
     }
   }
@@ -113,19 +150,19 @@ const generateData = async (numArticles = 1000) => {
     imageData,
     viewData,
     likeData,
-    sessionData,
-    articleTypeData
+    articleTypeData,
+    userData
   );
 };
 
 // Function to generate random image with specified width and height, and save to folder
-const generateImage = async (imageName, folderPath, width, height, title) => {
+const generateImage = async (imageName, folderPath, width, height, title, randomColor) => {
   const image = sharp({
     create: {
       width: width,
       height: height,
       channels: 3,
-      background: { r: 0, g: 0, b: 255 }, // Blue background
+      background: randomColor, // Use random color
     },
   });
 
@@ -151,12 +188,20 @@ const insertData = async (
   imageData,
   viewData,
   likeData,
-  sessionData,
-  articleTypeData
+  articleTypeData,
+  userData
 ) => {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+
+    // Insert Users
+    for (const user of userData) {
+      await client.query(
+        "INSERT INTO users (id, username, email, password_hash) VALUES ($1, $2, $3, $4)",
+        [user.id, user.username, user.email, user.password_hash]
+      );
+    }
 
     // Insert articles with unique timestamps
     let timestamp = new Date(); // Start with the current timestamp
@@ -193,24 +238,19 @@ const insertData = async (
       );
     }
 
-    // Insert sessions
-    for (const session of sessionData) {
-      await client.query("INSERT INTO sessions (id) VALUES ($1)", [session.id]);
-    }
-
     // Insert views
     for (const view of viewData) {
       await client.query(
-        "INSERT INTO views (article_id, session_id) VALUES ($1, $2)",
-        [view.article_id, view.session_id]
+        "INSERT INTO views (article_id, user_id, client_uuid) VALUES ($1, $2, $3)",
+        [view.article_id, view.user_id, view.client_uuid]
       );
     }
 
     // Insert likes
     for (const like of likeData) {
       await client.query(
-        "INSERT INTO likes (article_id, session_id) VALUES ($1, $2)",
-        [like.article_id, like.session_id]
+        "INSERT INTO likes (article_id, user_id) VALUES ($1, $2)",
+        [like.article_id, like.user_id]
       );
     }
 
@@ -218,13 +258,12 @@ const insertData = async (
     console.log("Data inserted successfully");
   } catch (err) {
     await client.query("ROLLBACK");
-    console.error("Error in data insertion:", err.stack);
+    console.error("Error in data insertion:", err); // Complete error log
   } finally {
     client.release();
   }
 };
 
-// Run the data generation process
 console.time("Script");
 generateData()
   .then(() => {
@@ -232,5 +271,7 @@ generateData()
   })
   .catch((err) => {
     console.error("Error generating dummy data:", err);
+  })
+  .finally(() => {
+    console.timeEnd("Script");
   });
-console.timeEnd("Script");

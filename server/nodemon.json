@@ -1,6 +1,7 @@
 {
   "watch": ["."],
-  "ext": "ts",
+  "ext": "ts,json",
   "exec": "ts-node index.ts",
-  "delay": "2"
+  "delay": "2",
+  "ignore": ["node_modules/"]
 }
