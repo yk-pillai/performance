@@ -42,11 +42,11 @@ function LoginModal({ onClose, onSwitchToSignup }: LoginModalProps) {
     password: "",
   });
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
-  const { setTokenAsSession } = useSession();
+  const { updateSession } = useSession();
   const loginMutation = useMutation({
     mutationFn: authenticate,
     onSuccess(data) {
-      setTokenAsSession(data.token);
+      updateSession({ token: data.token, uname: data.uname });
       onClose();
     },
   });
@@ -129,7 +129,9 @@ function LoginModal({ onClose, onSwitchToSignup }: LoginModalProps) {
             <button
               type="submit"
               disabled={loginMutation.isPending}
-              className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              className={`px-4 py-2 text-sm font-medium text-white ${
+                loginMutation.isPending ? "bg-indigo-300" : "bg-indigo-600"
+              } rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500`}
             >
               {loginMutation.isPending ? "Logging in..." : "Login"}
             </button>

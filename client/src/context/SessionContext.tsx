@@ -1,37 +1,52 @@
 import { createContext, useContext, useState } from "react";
 
-interface SessionContextType {
-  sessionId: string | null;
-  setTokenAsSession: (token: string) => void;
+interface Session {
+  token: string | null;
+  uname: string | null;
 }
 
+interface SessionContextType {
+  updateSession: (session: Session) => void;
+  session: Session;
+}
+
+const defaultSession = { token: null, uname: null };
+
 const SessionContext = createContext<SessionContextType>({
-  sessionId: "",
-  setTokenAsSession: () => {},
+  updateSession: () => {},
+  session: defaultSession,
 });
+
+export const useSession = () => useContext(SessionContext);
+
+const getSession = () => {
+  const session = localStorage.getItem("session");
+  if (session) {
+    return { ...JSON.parse(session) };
+  }
+  return defaultSession;
+};
 
 export const SessionContextProvider = ({
   children,
 }: {
   children: React.ReactNode;
 }) => {
-  const [sessionId, setSessionId] = useState<string | null>(() => {
-    const storedSessionId = localStorage.getItem("sessionId");
-    // if (!storedSessionId) {
-    //   storedSessionId = crypto.randomUUID();
-    //   localStorage.setItem("sessionId", storedSessionId);
-    // }
-    return storedSessionId;
-  });
-  const setTokenAsSession = (token: string) => {
-    localStorage.setItem("sessionId", token);
-    setSessionId(token);
+  const [session, setSession] = useState(getSession());
+
+  const updateSession = (session: Session) => {
+    const { token } = session;
+    if (token) {
+      localStorage.setItem("session", JSON.stringify(session));
+    } else {
+      localStorage.removeItem("session");
+    }
+    setSession(session);
   };
+
   return (
-    <SessionContext.Provider value={{ sessionId, setTokenAsSession }}>
+    <SessionContext.Provider value={{ updateSession, session }}>
       {children}
     </SessionContext.Provider>
   );
 };
-
-export const useSession = () => useContext(SessionContext);

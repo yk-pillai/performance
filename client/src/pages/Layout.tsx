@@ -19,7 +19,7 @@ function Layout() {
   };
 
   return (
-    <div>
+    <div className="m-2">
       <Header onLoginClick={() => setShowLoginModal(true)} />
       <Outlet />
       {showSignupModal && (

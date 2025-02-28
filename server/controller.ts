@@ -26,7 +26,6 @@ export const getAllCategories = async (req: Request, res: Response) => {
 
 export const getArticle = async (req: Request, res: Response) => {
   try {
-    console.log(req.params);
     const params = getArticlesParams.parse(req.params);
     const { id } = params;
     const result = await pool.query(
@@ -55,7 +54,6 @@ export const getArticle = async (req: Request, res: Response) => {
 
 export const getArticles = async (req: Request, res: Response) => {
   try {
-    console.log(req.query);
     const pagination = paginationSchema.parse(req.query);
     const params = getArticlesParams.parse(req.params);
     const paraQuery = [];
@@ -165,33 +163,38 @@ export const likeArticle = async (
   }
 };
 
-export const login = async (req: Request, res: Response):Promise<any> => {
+export const login = async (req: Request, res: Response): Promise<any> => {
   const { email, password } = req.body;
   try {
-    // const user = await db.query("SELECT * FROM users WHERE email = $1", [
-    //   email,
-    // ]);
+    const result = await pool.query(
+      "SELECT * from users WHERE LOWER(email) = $1",
+      [email.toLowerCase()]
+    );
 
-    if (email !== "yedhu.pillai3@gmail.com") {
+    if (result.rows.length === 0) {
       return res.status(401).json({ error: "Invalid email or password." });
     }
 
     const passwordMatch = await bcrypt.compare(
       password,
-      "$2b$10$pWXQjFuZ0FpGdqsKGrIl1.5Tn5JnbYyFPNBs9uj0CiEpsEbd8nlUy"
+      result.rows[0].password_hash
     );
 
-    await new Promise((res) => setTimeout(res,2000))
+    await new Promise((res) => setTimeout(res, 2000));
 
     if (!passwordMatch) {
       return res.status(401).json({ error: "Invalid email or password." });
     }
-    const user = { email: email };
+    const user = { email, username: result.rows[0].username };
     const token = jwt.sign(user, JWT_SECRET_KEY, {
       expiresIn: "1h",
       algorithm: "HS256",
     });
-    return res.json({ message: "Login successful.", token });
+    return res.json({
+      message: "Login successful.",
+      token,
+      uname: result.rows[0].username,
+    });
   } catch (error) {
     console.error("Login error:", error);
     return res.status(500).json({ error: "Internal server error." });

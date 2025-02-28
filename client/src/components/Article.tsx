@@ -10,7 +10,7 @@ import { useSession } from "../context/SessionContext";
 
 async function getArticle(artId: string): Promise<ArticleT | undefined> {
   try {
-    const data = await fetch(`${API_BACKEND_URL}/article/${artId}`,{
+    const data = await fetch(`${API_BACKEND_URL}/article/${artId}`, {
       credentials: "include",
     });
     const res = await data.json();
@@ -21,11 +21,14 @@ async function getArticle(artId: string): Promise<ArticleT | undefined> {
   return undefined;
 }
 
-async function likeArticle(artId: string, sessionId: string | null): Promise<void> {
+async function likeArticle(
+  artId: string,
+  sessionId: string | null
+): Promise<void> {
   try {
     const response = await fetch(`${API_BACKEND_URL}/article/like`, {
       method: "POST",
-      credentials: 'include',
+      credentials: "include",
       headers: {
         "Content-Type": "application/json",
       },
@@ -45,7 +48,8 @@ const Article = () => {
   const { pathname } = useLocation();
   const path = pathname.split("/");
   const artId = path[path.length - 1];
-  const { sessionId } = useSession();
+  const { session } = useSession();
+  const { uname } = session;
   const queryClient = useQueryClient();
 
   const { data, isLoading, error, refetch } = useQuery({
@@ -54,7 +58,7 @@ const Article = () => {
   });
 
   const likeMutation = useMutation({
-    mutationFn: () => likeArticle(artId, sessionId),
+    mutationFn: () => likeArticle(artId, uname),
     onMutate: async () => {
       await queryClient.cancelQueries({ queryKey: ["article", artId] });
       const previousArticle = queryClient.getQueryData<ArticleT>([
@@ -113,7 +117,7 @@ const Article = () => {
 
   return (
     <>
-      <div className="flex justify-start gap-10 items-center p-2">
+      <div className="flex justify-start gap-10 items-center p-">
         <div
           className="flex items-center gap-1 cursor-pointer"
           onClick={handleLike}
