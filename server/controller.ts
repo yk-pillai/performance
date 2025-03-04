@@ -12,6 +12,128 @@ import {
 import { DatabaseError } from "pg";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
+import { getRedisClient } from "./redisClient";
+
+interface ConnectedClient {
+  res: Response;
+  articleId: string;
+}
+
+// Define the type of connectedClients
+const connectedClients: { [key: string]: ConnectedClient } = {};
+
+export const sendLikeCountUpdate = async (
+  req: Request,
+  res: Response
+): Promise<any> => {
+  const redisClient = getRedisClient();
+  const articleId = String(req.params.id); //Ensure articleId is a string.
+
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.flushHeaders();
+
+  const clientId = req.cookies.client_id;
+
+  if (!clientId) {
+    console.error("clientId is undefined in sendLikeCountUpdate");
+    res.status(400).json({ error: "clientId is missing" });
+    return;
+  }
+
+  try {
+    // Store client in Redis
+    await redisClient.sAdd(`article:${articleId}:clients`, clientId);
+    await redisClient.hSet(`client:${clientId}`, { articleId, clientId });
+
+    // Store the response object
+    connectedClients[clientId] = { res, articleId };
+
+    req.on("close", async () => {
+      try {
+        // Remove client from Redis
+        await redisClient.sRem(`article:${articleId}:clients`, clientId);
+        await redisClient.del(`client:${clientId}`);
+        // Remove the response object
+        if (connectedClients[clientId]) {
+          delete connectedClients[clientId];
+        }
+      } catch (redisCloseError) {
+        console.error("Redis error on connection close:", redisCloseError);
+      }
+    });
+  } catch (redisError) {
+    console.error(
+      `Redis error in sendLikeCountUpdate (articleId: ${articleId}, clientId: ${clientId}):`,
+      redisError
+    );
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+async function sendLikeUpdate(articleId: string, likeCount: number) {
+  const redisClient = getRedisClient();
+  try {
+    const clientIds = await redisClient.sMembers(
+      `article:${articleId}:clients`
+    );
+    console.log(clientIds, "clientIds");
+    for (const clientId of clientIds) {
+      const clientData = await redisClient.hGetAll(`client:${clientId}`);
+      if (clientData && clientData.articleId === articleId) {
+        const response =
+          connectedClients[clientId] && connectedClients[clientId].res;
+        if (response) {
+          response.write(`data: ${JSON.stringify({ likeCount })}\n\n`);
+        }
+      }
+    }
+  } catch (redisError) {
+    console.error("Redis error in sendLikeUpdate:", redisError);
+  }
+}
+
+export const likeArticle = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const user = (req as any).user;
+    console.log(user,'user')
+    if (user) {
+      const likeData = likeArticleSchema.parse(req.body);
+      const { artId } = likeData;
+
+      await pool.query(
+        `INSERT INTO likes (article_id, user_id) VALUES ($1,$2)`,
+        [artId, user.user_id]
+      );
+
+      // Get updated like count
+      const likeCountResult = await pool.query(
+        `SELECT COUNT(*) FROM likes WHERE article_id = $1`,
+        [artId]
+      );
+      const likeCount = likeCountResult.rows[0].count;
+
+      // Send SSE update
+      await sendLikeUpdate(artId, likeCount);
+
+      res.status(201).json({ message: "Liked the article." });
+    } else {
+      res.status(401).json({ error: "Authentication required." });
+    }
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ error: error.errors[0].message });
+    } else if (error instanceof DatabaseError && error.code === "23505") {
+      res.status(409).json({ error: "Like already exists" });
+    } else {
+      res.status(500).json({ error: "Failed to add like." });
+    }
+  }
+};
 
 export const getAllCategories = async (req: Request, res: Response) => {
   try {
@@ -134,35 +256,6 @@ export const getArticlesForSearch = async (req: Request, res: Response) => {
   }
 };
 
-export const likeArticle = async (
-  req: Request,
-  res: Response
-): Promise<void> => {
-  try {
-    if ((req as any).user) {
-      const likeData: LikeArticle = likeArticleSchema.parse(req.body);
-      const { artId, sessionId } = likeData;
-      await pool.query(
-        `
-      INSERT INTO likes (article_id, session_id) VALUES ($1,$2)
-    `,
-        [artId, sessionId]
-      );
-      res.status(201).json({ message: "Liked the article." });
-    } else {
-      res.status(401).json({ error: "Authentication required." });
-    }
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      res.status(400).json({ error: error.errors[0].message });
-    } else if (error instanceof DatabaseError && error.code === "23505") {
-      res.status(409).json({ error: "Like already exists" });
-    } else {
-      res.status(500).json({ error: "Failed to add like." });
-    }
-  }
-};
-
 export const login = async (req: Request, res: Response): Promise<any> => {
   const { email, password } = req.body;
   try {
@@ -185,7 +278,11 @@ export const login = async (req: Request, res: Response): Promise<any> => {
     if (!passwordMatch) {
       return res.status(401).json({ error: "Invalid email or password." });
     }
-    const user = { email, username: result.rows[0].username };
+    const user = {
+      email,
+      username: result.rows[0].username,
+      user_id: result.rows[0].id,
+    };
     const token = jwt.sign(user, JWT_SECRET_KEY, {
       expiresIn: "1h",
       algorithm: "HS256",

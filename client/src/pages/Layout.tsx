@@ -3,10 +3,11 @@ import { Outlet } from "react-router-dom";
 import Header from "../components/Header";
 import SignupModal from "../components/SignupModal";
 import LoginModal from "../components/LoginModal";
+import Title from "../components/Title";
 
 function Layout() {
   const [showSignupModal, setShowSignupModal] = useState(false);
-  const [showLoginModal, setShowLoginModal] = useState(false); 
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
   const handleSwitchToSignup = () => {
     setShowLoginModal(false);
@@ -18,10 +19,15 @@ function Layout() {
     setShowLoginModal(true);
   };
 
+  const openLoginModal = () => {
+    setShowLoginModal(true);
+  };
+
   return (
     <div className="m-2">
       <Header onLoginClick={() => setShowLoginModal(true)} />
-      <Outlet />
+      <Title/>
+      <Outlet context={{ openLoginModal }} />
       {showSignupModal && (
         <SignupModal
           onClose={() => setShowSignupModal(false)}

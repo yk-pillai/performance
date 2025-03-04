@@ -1,5 +1,5 @@
 import { ArticleT } from "../types";
-import { useLocation } from "react-router-dom";
+import { useLocation, useOutletContext } from "react-router-dom";
 import HeartIcon from "./HeartIcon";
 import EyeIcon from "./EyeIcon";
 import HorizontalRule from "./HorizontalRule";
@@ -7,6 +7,7 @@ import { API_BACKEND_URL } from "../constants";
 import BannerImage from "./BannerImage";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "../context/SessionContext";
+import { useEffect, useRef } from "react";
 
 async function getArticle(artId: string): Promise<ArticleT | undefined> {
   try {
@@ -31,8 +32,9 @@ async function likeArticle(
       credentials: "include",
       headers: {
         "Content-Type": "application/json",
+        Authorization: `Bearer ${sessionId}`,
       },
-      body: JSON.stringify({ artId, sessionId }),
+      body: JSON.stringify({ artId }),
     });
     if (!response.ok) {
       const errorData = await response.json();
@@ -49,8 +51,10 @@ const Article = () => {
   const path = pathname.split("/");
   const artId = path[path.length - 1];
   const { session } = useSession();
-  const { uname } = session;
+  const { token } = session;
   const queryClient = useQueryClient();
+  const { openLoginModal } = useOutletContext<{ openLoginModal: () => void }>();
+  const eventSourceRef = useRef<EventSource | null>(null);
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["article", artId],
@@ -58,7 +62,7 @@ const Article = () => {
   });
 
   const likeMutation = useMutation({
-    mutationFn: () => likeArticle(artId, uname),
+    mutationFn: () => likeArticle(artId, token),
     onMutate: async () => {
       await queryClient.cancelQueries({ queryKey: ["article", artId] });
       const previousArticle = queryClient.getQueryData<ArticleT>([
@@ -81,16 +85,52 @@ const Article = () => {
         context?.previousArticle
       );
     },
-    // onSettled: () => {
-    //   queryClient.invalidateQueries({ queryKey: ["article", artId] });
-    // },
   });
 
   const handleLike = () => {
+    if (!token) {
+      openLoginModal();
+      return;
+    }
     if (!likeMutation.isPending) {
       likeMutation.mutate();
     }
   };
+
+  useEffect(() => {
+    if (data) {
+      eventSourceRef.current = new EventSource(
+        `${API_BACKEND_URL}/sse/like-count/${artId}`,{
+          withCredentials: true
+        }
+      );
+
+      eventSourceRef.current.onmessage = (event) => {
+        const message = JSON.parse(event.data);
+        if (message.likeCount !== undefined) {
+          queryClient.setQueryData<ArticleT>(["article", artId], (oldData) => {
+            if (oldData) {
+              return { ...oldData, likes: String(message.likeCount) };
+            }
+            return oldData;
+          });
+        }
+      };
+
+      eventSourceRef.current.onerror = (error) => {
+        console.error("SSE error:", error);
+        if (eventSourceRef.current) {
+          eventSourceRef.current.close();
+        }
+      };
+
+      return () => {
+        if (eventSourceRef.current) {
+          eventSourceRef.current.close();
+        }
+      };
+    }
+  }, [artId, queryClient, data]);
 
   if (isLoading) {
     return <p className="flex justify-center">Fetching the article...</p>;

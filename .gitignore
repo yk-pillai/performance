@@ -5,6 +5,7 @@ node_modules
 *.swp  # Swap files
 *.log  # Log files
 .dockerignore # If you have one
+.vscode/
 
 # Client
 client/node_modules

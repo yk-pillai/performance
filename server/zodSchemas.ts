@@ -32,7 +32,6 @@ export const getArticlesParams = z.object({
 
 export const likeArticleSchema = z.object({
   artId: z.string().uuid(),
-  sessionId: z.string().uuid(),
 });
 
 export type LikeArticle = z.infer<typeof likeArticleSchema>;
