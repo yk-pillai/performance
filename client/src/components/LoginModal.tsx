@@ -4,6 +4,7 @@ import { LoginSchema } from "../schema";
 import { API_BACKEND_URL } from "../constants";
 import { useMutation } from "@tanstack/react-query";
 import { useSession } from "../context/SessionContext";
+import toast from "react-hot-toast";
 
 interface LoginModalProps {
   onClose: () => void;
@@ -47,6 +48,10 @@ function LoginModal({ onClose, onSwitchToSignup }: LoginModalProps) {
     mutationFn: authenticate,
     onSuccess(data) {
       updateSession({ token: data.token, uname: data.uname });
+      toast.success(`${data.uname} you are logged in.`,{
+        position: "top-center",
+        duration: 5000
+      })
       onClose();
     },
   });

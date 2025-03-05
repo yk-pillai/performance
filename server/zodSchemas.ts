@@ -30,8 +30,12 @@ export const getArticlesParams = z.object({
   id: z.string().uuid({ message: "Invalid category id." }),
 });
 
+export const userActivityParams = getArticlesParams;
+
 export const likeArticleSchema = z.object({
-  artId: z.string().uuid(),
+  artId: z.string().uuid({ message: "Invalid category id." }),
 });
+
+export const viewArticleSchema = likeArticleSchema;
 
 export type LikeArticle = z.infer<typeof likeArticleSchema>;

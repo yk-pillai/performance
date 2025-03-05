@@ -4,6 +4,7 @@ import { useSession } from "../context/SessionContext";
 import SearchIcon from "./SearchIcon";
 import { useState } from "react";
 import CancelIcon from "./CancelIcon";
+import toast from "react-hot-toast";
 
 interface HeaderProps {
   onLoginClick: () => void;
@@ -16,6 +17,10 @@ const Header = ({ onLoginClick }: HeaderProps) => {
   const logout = () => {
     if (confirm(`${uname} do you want to log out?`)) {
       updateSession({ token: null, uname: null });
+      toast.success(`${uname} you have been logged out.`,{
+        position: "top-center",
+        duration: 5000
+      })
     }
   };
   return (

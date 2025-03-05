@@ -4,6 +4,7 @@ import Header from "../components/Header";
 import SignupModal from "../components/SignupModal";
 import LoginModal from "../components/LoginModal";
 import Title from "../components/Title";
+import { Toaster } from "react-hot-toast";
 
 function Layout() {
   const [showSignupModal, setShowSignupModal] = useState(false);
@@ -25,6 +26,7 @@ function Layout() {
 
   return (
     <div className="m-2">
+      <Toaster/>
       <Header onLoginClick={() => setShowLoginModal(true)} />
       <Title/>
       <Outlet context={{ openLoginModal }} />

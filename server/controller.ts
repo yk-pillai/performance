@@ -7,19 +7,20 @@ import {
   paginationSchema,
   searchSchema,
   likeArticleSchema,
-  LikeArticle,
+  viewArticleSchema,
+  userActivityParams,
 } from "./zodSchemas";
 import { DatabaseError } from "pg";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { getRedisClient } from "./redisClient";
+import { getLikesAndViewsCount } from "./utils";
 
 interface ConnectedClient {
   res: Response;
   articleId: string;
 }
 
-// Define the type of connectedClients
 const connectedClients: { [key: string]: ConnectedClient } = {};
 
 export const sendLikeCountUpdate = async (
@@ -72,27 +73,77 @@ export const sendLikeCountUpdate = async (
   }
 };
 
-async function sendLikeUpdate(articleId: string, likeCount: number) {
+async function sendClientUpdate(
+  articleId: string,
+  count: number,
+  type: string
+) {
   const redisClient = getRedisClient();
   try {
     const clientIds = await redisClient.sMembers(
       `article:${articleId}:clients`
     );
-    console.log(clientIds, "clientIds");
     for (const clientId of clientIds) {
       const clientData = await redisClient.hGetAll(`client:${clientId}`);
       if (clientData && clientData.articleId === articleId) {
         const response =
           connectedClients[clientId] && connectedClients[clientId].res;
         if (response) {
-          response.write(`data: ${JSON.stringify({ likeCount })}\n\n`);
+          let countObj;
+          if (type === "LIKE") {
+            countObj = {
+              likeCount: count,
+            };
+          } else {
+            countObj = { viewCount: count };
+          }
+          response.write(`data: ${JSON.stringify(countObj)}\n\n`);
         }
       }
     }
   } catch (redisError) {
-    console.error("Redis error in sendLikeUpdate:", redisError);
+    console.error("Redis error in sendClientUpdate:", redisError);
   }
 }
+
+export const getUserActivity = async (req: Request, res: Response) => {
+  try {
+    const user = (req as any).user;
+    const { id } = userActivityParams.parse(req.params);
+    let userID;
+    let columnName;
+    if (user) {
+      userID = user.user_id;
+      columnName = "user_id";
+    } else {
+      userID = req.cookies.client_id;
+      columnName = "client_uuid";
+    }
+    const likesResult = await pool.query(
+      `SELECT array_agg(cat.article_id) as articles from article_types cat 
+      INNER JOIN likes l on l.article_id=cat.article_id 
+      WHERE cat.type_id=$1 AND l.user_id=$2`,
+      [id, userID]
+    );
+    const viewsResult = await pool.query(
+      `SELECT array_agg(cat.article_id) as articles from article_types cat 
+      INNER JOIN views v on v.article_id=cat.article_id 
+      WHERE cat.type_id=$1 AND v.${columnName}=$2`,
+      [id, userID]
+    );
+    res.json({
+      likes: likesResult.rows[0]["articles"],
+      views: viewsResult.rows[0]["articles"],
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ error: error.errors[0].message });
+    } else {
+      console.error("Database Error:", error); // Log the actual error on the server
+      res.status(500).json({ error: "Failed to fetch articles" }); // Generic message for the client
+    }
+  }
+};
 
 export const likeArticle = async (
   req: Request,
@@ -100,7 +151,6 @@ export const likeArticle = async (
 ): Promise<void> => {
   try {
     const user = (req as any).user;
-    console.log(user,'user')
     if (user) {
       const likeData = likeArticleSchema.parse(req.body);
       const { artId } = likeData;
@@ -115,11 +165,10 @@ export const likeArticle = async (
         `SELECT COUNT(*) FROM likes WHERE article_id = $1`,
         [artId]
       );
-      const likeCount = likeCountResult.rows[0].count;
+      const likesCount = likeCountResult.rows[0].count;
 
       // Send SSE update
-      await sendLikeUpdate(artId, likeCount);
-
+      await sendClientUpdate(artId, likesCount, "LIKE");
       res.status(201).json({ message: "Liked the article." });
     } else {
       res.status(401).json({ error: "Authentication required." });
@@ -129,6 +178,50 @@ export const likeArticle = async (
       res.status(400).json({ error: error.errors[0].message });
     } else if (error instanceof DatabaseError && error.code === "23505") {
       res.status(409).json({ error: "Like already exists" });
+    } else {
+      res.status(500).json({ error: "Failed to add like." });
+    }
+  }
+};
+
+export const viewArticle = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    let viewedBy;
+    let columnName;
+    const user = (req as any).user;
+    if (user) {
+      viewedBy = user.user_id;
+      columnName = "user_id";
+    } else {
+      viewedBy = req.cookies.client_id;
+      columnName = "client_uuid";
+    }
+
+    const viewData = viewArticleSchema.parse(req.body);
+    const { artId } = viewData;
+
+    await pool.query(
+      `INSERT INTO views (article_id, ${columnName}) VALUES ($1,$2)`,
+      [artId, viewedBy]
+    );
+
+    const viewsCountResult = await pool.query(
+      `SELECT COUNT(*) FROM views WHERE article_id = $1`,
+      [artId]
+    );
+    const viewsCount = viewsCountResult.rows[0].count;
+
+    // Send SSE update
+    await sendClientUpdate(artId, viewsCount, "VIEW");
+    res.status(201).json({ message: "Viewed the article." });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ error: error.errors[0].message });
+    } else if (error instanceof DatabaseError && error.code === "23505") {
+      res.status(409).json({ error: "View already exists" });
     } else {
       res.status(500).json({ error: "Failed to add like." });
     }
@@ -150,6 +243,7 @@ export const getArticle = async (req: Request, res: Response) => {
   try {
     const params = getArticlesParams.parse(req.params);
     const { id } = params;
+    const user = (req as any).user;
     const result = await pool.query(
       `select art.*,TO_CHAR(art.timestamp, 'DD/MM/YYYY, HH12:MI:SS AM') AS timestamp,i.image_url, count(distinct l.user_id) as likes, COUNT(DISTINCT CASE WHEN v.user_id IS NOT NULL THEN v.user_id::TEXT ELSE v.client_uuid::TEXT END) AS views
       from articles art 
@@ -162,8 +256,15 @@ export const getArticle = async (req: Request, res: Response) => {
         `,
       [id]
     );
-    const article = result.rows;
-    res.status(200).json({ article });
+    const article = result.rows[0];
+    const { likesCount, viewsCount } = await getLikesAndViewsCount(
+      user,
+      id,
+      req
+    );
+    const isLiked = likesCount > 0;
+    const isViewed = viewsCount > 0;
+    res.status(200).json({ article, isLiked, isViewed });
   } catch (e) {
     if (e instanceof z.ZodError) {
       res.status(400).json({ error: e.errors[0].message });

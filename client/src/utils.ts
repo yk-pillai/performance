@@ -4,11 +4,11 @@ export const getScreenWidth = () => {
   return window.innerWidth;
 };
 export const getApiLimit = (apiName: string, width: number) => {
-  if (width < 640) {
+  if (width < 768) {
     if (apiName === ARTICLE) {
       return 3 * FETCH_MULTIPLYER;
     }
-  } else if (width < 1024) {
+  } else if (width < 1280) {
     if (apiName === ARTICLE) {
       return 8 * FETCH_MULTIPLYER;
     }
@@ -56,17 +56,17 @@ export function timeAgo(dateString: string): string {
 
 export function preloadImage(imageUrl: string) {
   if (imageUrl) {
-      const link = document.createElement("link");
-      link.rel = "preload";
-      link.as = "image";
-      link.href = imageUrl;
-      link.imageSrcset = imageUrl;
-      link.imageSizes = "auto"; 
-      document.head.appendChild(link);
+    const link = document.createElement("link");
+    link.rel = "preload";
+    link.as = "image";
+    link.href = imageUrl;
+    link.imageSrcset = imageUrl;
+    link.imageSizes = "auto";
+    document.head.appendChild(link);
 
-      return () => { 
-          document.head.removeChild(link);
-      };
+    return () => {
+      document.head.removeChild(link);
+    };
   }
-  return () => {}; 
+  return () => {};
 }

@@ -1,7 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import EyeIcon from "./EyeIcon";
-import HeartIcon from "./HeartIcon";
 import { getApiLimit, preloadImage, timeAgo } from "../utils";
 import {
   API_BACKEND_URL,
@@ -11,17 +9,25 @@ import {
 } from "../constants";
 import UpArrowIcon from "./UpArrowIcon";
 import SmoothScrollLink from "./SmoothScrollLink";
-import { ArticleT } from "../types";
+import { Article } from "../types";
+import Like from "./Like";
+import Views from "./Views";
+import { useSession } from "../context/SessionContext";
 
 const ArticleList = () => {
-  const [articles, setArticles] = useState<ArticleT[]>([]);
-  const [displayedArticles, setDisplayedArticles] = useState<ArticleT[]>([]);
+  const [articles, setArticles] = useState<Article[]>([]);
+  const [displayedArticles, setDisplayedArticles] = useState<Article[]>([]);
+  const [likedArticle, setLikedArticle] = useState(new Set());
+  const [viewedArticle, setViewedArticle] = useState(new Set());
   const { pathname } = useLocation();
   const path = pathname.split("/");
   const catId = path[path.length - 1];
   const limit = getApiLimit(ARTICLE, window.innerWidth);
   const showLimit = (limit / FETCH_MULTIPLYER) * 2;
   const observerRef = useRef<IntersectionObserver | null>(null);
+  const {
+    session: { token },
+  } = useSession();
 
   const getArticles = async (
     catId: string,
@@ -32,12 +38,33 @@ const ArticleList = () => {
       const data = await fetch(
         `${API_BACKEND_URL}/articles/${catId}?limit=${limit}&cursor=${
           cursor ?? ""
-        }`,{
+        }`,
+        {
           credentials: "include",
         }
       );
       const res = await data.json();
       return res.articles;
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const getUserLikesAndViews = async (
+    catId: string,
+    sessionId: string | null
+  ) => {
+    try {
+      const data = await fetch(`${API_BACKEND_URL}/user/activity/${catId}`, {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${sessionId}`,
+        },
+      });
+      const res = await data.json();
+      return res;
     } catch (err) {
       console.error(err);
     }
@@ -64,7 +91,7 @@ const ArticleList = () => {
     }
   };
 
-  const manageDisplayedArticles = (combinedArticles: ArticleT[]) => {
+  const manageDisplayedArticles = (combinedArticles: Article[]) => {
     setArticles(combinedArticles);
     setDisplayedArticles((prev) => [
       ...prev,
@@ -92,6 +119,9 @@ const ArticleList = () => {
 
   useEffect(() => {
     async function getInitialArticles() {
+      const { likes, views } = await getUserLikesAndViews(catId, token);
+      setLikedArticle(new Set(likes));
+      setViewedArticle(new Set(views));
       const res = await getArticles(catId, limit);
       const combinedArticles = [...articles, ...res];
 
@@ -109,9 +139,10 @@ const ArticleList = () => {
   if (!displayedArticles.length) {
     return <p>Loading...</p>;
   }
+  console.log(displayedArticles);
   return (
-    <div className="article-list grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3 sm:gap-6">
-      {displayedArticles.map((article: ArticleT) => (
+    <div className="article-list grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 sm:gap-6">
+      {displayedArticles.map((article: Article) => (
         <Link
           to={`/article/${article.id}`}
           state={{ title: article.title }}
@@ -137,14 +168,20 @@ const ArticleList = () => {
 
               {/* Views & Likes */}
               <div className="flex justify-around items-center text-sm mt-3">
-                <div className="flex items-center gap-1">
-                  <HeartIcon className="h-5 w-5 text-white" />
-                  <span className="text-red-500">{article.likes}</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <EyeIcon className="h-6 w-6 text-white" stroke="dodgerblue" />
-                  <span className="text-blue-800">{article.views}</span>
-                </div>
+                <Like
+                  classes={`h-5 w-5 ${
+                    likedArticle.has(article.id) ? "text-red-500" : "text-white"
+                  }`}
+                  noOfLikes={article.likes}
+                />
+                <Views
+                  classes={`h-6 w-6 ${
+                    viewedArticle.has(article.id)
+                      ? "text-blue-300"
+                      : "text-white"
+                  }`}
+                  noOfViews={article.views}
+                />
                 <div>{timeAgo(article.timestamp)}</div>
               </div>
             </div>
