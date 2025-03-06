@@ -1,11 +1,44 @@
 import React, { useState } from "react";
 import * as z from "zod";
 import { SignupSchema } from "../schema";
+import toast from "react-hot-toast";
+import { useMutation } from "@tanstack/react-query";
+import { API_BACKEND_URL } from "../constants";
 
 interface SignupModalProps {
   onClose: () => void;
   onSwitchToLogin: () => void;
 }
+
+type SignUpFormData = {
+  email: string;
+  password: string;
+  username: string;
+  confirmPassword: string;
+};
+
+const signup = async (formData: SignUpFormData) => {
+  try {
+    const response = await fetch(`${API_BACKEND_URL}/signup`, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(formData),
+    });
+    if (!response.ok) {
+      const errorData = await response.json();
+      const error = new Error(errorData.error || "Failed to log in.");
+      (error as FetchError).response = response; // Attach the response object
+      throw error;
+    }
+    return await response.json();
+  } catch (e) {
+    const error = e as FetchError;
+    throw error;
+  }
+};
 
 function SignupModal({ onClose, onSwitchToLogin }: SignupModalProps) {
   const [formData, setFormData] = useState({
@@ -16,6 +49,31 @@ function SignupModal({ onClose, onSwitchToLogin }: SignupModalProps) {
   });
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
+  const signUpMutation = useMutation({
+    mutationFn: signup,
+    onSuccess(data) {
+      toast.success(`${data.message}`, {
+        position: "top-center",
+        duration: 5000,
+      });
+      onClose();
+    },
+    onError: (err: FetchError) => {
+      if (err.response?.status === 409) {
+        toast.error("Username or email is already taken", {
+          position: "top-center",
+          duration: 3000,
+        });
+      }
+      if (err.response?.status === 400) {
+        toast.error(err.message, {
+          position: "top-center",
+          duration: 3000,
+        });
+      }
+    },
+  });
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
@@ -25,13 +83,13 @@ function SignupModal({ onClose, onSwitchToLogin }: SignupModalProps) {
     try {
       SignupSchema.parse(formData);
       setErrors({});
-      console.log("Signup data:", formData);
-      onClose();
+      signUpMutation.mutate(formData);
+      // onClose();
     } catch (error) {
       if (error instanceof z.ZodError) {
         const newErrors: { [key: string]: string } = {};
         error.errors.forEach((err) => {
-          if (err.path && err.path[0]) {
+          if (err.path && err.path[0] && !newErrors[err.path[0]]) {
             newErrors[err.path[0]] = err.message;
           }
         });

@@ -11,10 +11,6 @@ import toast from "react-hot-toast";
 import Like from "./Like";
 import Views from "./Views";
 
-interface FetchError extends Error {
-  response?: Response;
-}
-
 async function getArticle(
   artId: string,
   sessionId: string | null
@@ -117,7 +113,6 @@ const Article = () => {
       ]);
       queryClient.setQueryData<ArticleT>(["article", artId], (oldArticle) => {
         if (oldArticle) {
-          console.log(oldArticle);
           const updatedArticle = {
             ...oldArticle,
             isLiked: true,
@@ -157,7 +152,6 @@ const Article = () => {
       ]);
       queryClient.setQueryData<ArticleT>(["article", artId], (oldArticle) => {
         if (oldArticle) {
-          console.log(oldArticle);
           const updatedArticle = {
             ...oldArticle,
             isViewed: true,

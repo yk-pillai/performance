@@ -139,7 +139,6 @@ const ArticleList = () => {
   if (!displayedArticles.length) {
     return <p>Loading...</p>;
   }
-  console.log(displayedArticles);
   return (
     <div className="article-list grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 sm:gap-6">
       {displayedArticles.map((article: Article) => (

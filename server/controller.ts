@@ -9,6 +9,7 @@ import {
   likeArticleSchema,
   viewArticleSchema,
   userActivityParams,
+  SignupSchema,
 } from "./zodSchemas";
 import { DatabaseError } from "pg";
 import jwt from "jsonwebtoken";
@@ -396,5 +397,27 @@ export const login = async (req: Request, res: Response): Promise<any> => {
   } catch (error) {
     console.error("Login error:", error);
     return res.status(500).json({ error: "Internal server error." });
+  }
+};
+
+export const signup = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const { email, password, username } = SignupSchema.parse(req.body);
+    const hashedPassword = await bcrypt.hash(password, 10);
+    await pool.query(
+      "INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3)",
+      [username, email, hashedPassword]
+    );
+    return res.json({
+      message: "Signup successful.",
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ error: error.errors[0].message });
+    } else if (error instanceof DatabaseError && error.code === "23505") {
+      res.status(409).json({ error: "Username or email already exists" });
+    } else {
+      res.status(500).json({ error: "Failed to sign up." });
+    }
   }
 };

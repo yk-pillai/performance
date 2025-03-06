@@ -8,6 +8,7 @@ import {
   viewArticle,
   sendLikeCountUpdate,
   getUserActivity,
+  signup,
 } from "./controller";
 import express from "express";
 import { authenticateToken } from "./middlewares/jwtAuthMiddleware";
@@ -23,5 +24,6 @@ router.post("/article/like", authenticateToken, likeArticle);
 router.post("/article/view", authenticateToken, viewArticle);
 router.get("/user/activity/:id", authenticateToken, getUserActivity);
 router.post("/login", login);
+router.post("/signup", signup);
 
 export default router;
