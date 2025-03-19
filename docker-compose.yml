@@ -16,7 +16,7 @@ services:
   server:
     build:
       context: ./server # Path to backend directory
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
     ports:
       - "5000:5000"  # Expose server on port 5000
     volumes:
@@ -24,6 +24,7 @@ services:
       - /usr/src/app/node_modules
     environment:
       DATABASE_URL: postgres://yk:postgresql@db:5432/performance # Connection to DB container
+      NODE_ENV: development
     depends_on:
       - db
       - redis

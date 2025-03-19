@@ -1,21 +1,25 @@
-# Use official Node.js image as base
-FROM node:20-alpine
+# Stage 1: Build (TypeScript Compilation)
+FROM node:20-alpine AS build
 
-# Set the working directory
 WORKDIR /usr/src/app
 
-# Copy package.json and package-lock.json
 COPY package*.json ./
 
-# Install dependencies
 RUN npm install
 
-# Copy the rest of the app
 COPY . .
 
-# Expose the port for backend (5000)
-EXPOSE 5000
-RUN npm install -g nodemon
+RUN npx tsc
 
-# Command to run the backend
-CMD ["npm", "run", "dev"]
+# Stage 2: Production (Runtime)
+FROM node:20-alpine
+
+WORKDIR /usr/src/app
+
+COPY --from=build /usr/src/app/package*.json ./
+COPY --from=build /usr/src/app/node_modules ./node_modules
+COPY --from=build /usr/src/app/dist ./dist
+
+EXPOSE 5000
+
+CMD ["npm", "run", "start"]

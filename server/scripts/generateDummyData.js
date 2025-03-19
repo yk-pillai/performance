@@ -1,23 +1,13 @@
 import fs from "fs";
-import pg from "pg"; // Import the default export
-const { Pool } = pg;
 import { faker } from "@faker-js/faker";
 import sharp from "sharp";
 import path, { dirname } from "path";
 import bcrypt from "bcryptjs";
 import { fileURLToPath } from "url";
+import pool from '../db'
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-
-// Setup PostgreSQL connection
-const pool = new Pool({
-  user: "yk",
-  host: "localhost",
-  database: "performance",
-  password: "postgresql",
-  port: 5432,
-});
 
 // Path to save images
 const imagePathHero = path.join(__dirname, "..", "images", "hero");

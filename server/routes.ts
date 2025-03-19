@@ -9,12 +9,14 @@ import {
   sendLikeCountUpdate,
   getUserActivity,
   signup,
+  healthCheck,
 } from "./controller";
 import express from "express";
 import { authenticateToken } from "./middlewares/jwtAuthMiddleware";
 
 const router = express.Router();
 
+router.get("/health", healthCheck);
 router.get("/categories", getAllCategories);
 router.get("/articles/:id", authenticateToken, getArticles);
 router.get("/articles/s/:id", getArticlesForSearch);

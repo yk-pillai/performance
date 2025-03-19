@@ -1,3 +1,5 @@
+import * as dotenv from 'dotenv';
+dotenv.config();
 import express, { Request, Response, NextFunction } from "express";
 import router from "./routes";
 import cors from "cors";
@@ -57,7 +59,7 @@ async function startServer() {
   });
 
   // Start server
-  const PORT = process.env.PORT || 5000;
+  const PORT = process.env.BACKEND_PORT;
   app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
   });

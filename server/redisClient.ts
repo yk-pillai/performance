@@ -4,7 +4,7 @@ let redisClient: RedisClientType;
 
 export const initializeRedisClient = async () => {
   redisClient = createClient({
-    url: "redis://redis:6379",
+    url: `redis://${process.env.REDIS_HOST}:6379`,
   });
 
   redisClient.on("error", (err) => console.log("Redis Client Error", err));
@@ -15,7 +15,9 @@ export const initializeRedisClient = async () => {
 
 export const getRedisClient = () => {
   if (!redisClient) {
-    throw new Error("Redis client not initialized. Call initializeRedisClient first.");
+    throw new Error(
+      "Redis client not initialized. Call initializeRedisClient first."
+    );
   }
   return redisClient;
 };

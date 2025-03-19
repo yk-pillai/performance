@@ -1,7 +1,7 @@
 # Root level
 node_modules
 .env
-.DS_Store # For macOS
+.DS_Store
 *.swp  # Swap files
 *.log  # Log files
 .dockerignore # If you have one
