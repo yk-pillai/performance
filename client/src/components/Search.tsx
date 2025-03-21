@@ -35,7 +35,7 @@ const Search = () => {
         }
       }
       clearTimeout(timeOutRef.current);
-      timeOutRef.current = setTimeout(() => {
+      timeOutRef.current = window.setTimeout(() => {
         getSearchedResult();
       }, 400);
     }
