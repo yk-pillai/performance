@@ -20,6 +20,9 @@ COPY --from=build /usr/src/app/package*.json ./
 COPY --from=build /usr/src/app/node_modules ./node_modules
 COPY --from=build /usr/src/app/dist ./dist
 
+# Copy the images directory
+COPY images/ /usr/src/app/images/
+
 EXPOSE 5000
 
 CMD ["npm", "run", "start"]

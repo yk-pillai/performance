@@ -1,4 +1,4 @@
-import * as dotenv from 'dotenv';
+import * as dotenv from "dotenv";
 dotenv.config();
 import express, { Request, Response, NextFunction } from "express";
 import router from "./routes";
@@ -11,7 +11,6 @@ import { initializeRedisClient } from "./redisClient";
 const app = express();
 
 async function startServer() {
-
   await initializeRedisClient()
   // the below function is for session based auth
   // await setupSessionMiddleware(app);
@@ -32,8 +31,11 @@ async function startServer() {
   app.use(express.json());
 
   // Static files middleware
-  app.use("/images", express.static(path.join(__dirname, "images")));
-
+  if (process.env.NODE_ENV === "development") {
+    app.use("/images", express.static(path.join(__dirname, "images")));
+  } else {
+    app.use("/images", express.static(path.join(__dirname, "..", "images")));
+  }
   app.use(cookieParser());
 
   // set client_id to track an anonymous user
@@ -51,6 +53,10 @@ async function startServer() {
 
   // API routes
   app.use("/api", router);
+
+  app.use("/", (req, res) => {
+    res.status(200).json({ message: "Performance Backend." });
+  });
 
   // Error handling middleware (example - add your own logic)
   app.use((err: any, req: Request, res: Response, next: NextFunction) => {
