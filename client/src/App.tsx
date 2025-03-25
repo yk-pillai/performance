@@ -1,10 +1,13 @@
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import Layout from "./pages/Layout";
-import CategoryList from "./components/CategoryList";
-import ArticleList from "./components/ArticleList";
-import Article from "./components/Article";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
+import { lazy, Suspense } from 'react';
+
+// Dynamically load components
+const CategoryList = lazy(() => import("./components/CategoryList"));
+const ArticleList = lazy(() => import("./components/ArticleList"));
+const Article = lazy(() => import("./components/Article"));
 
 const queryClient = new QueryClient();
 const router = createBrowserRouter([
@@ -18,20 +21,29 @@ const router = createBrowserRouter([
       },
       {
         path: "/category/:id",
-        element: <ArticleList />,
+        element: (
+          <Suspense fallback={<div>Loading...</div>}>
+            <ArticleList />
+          </Suspense>
+        ),
       },
       {
         path: "/article/:id",
-        element: <Article />,
+        element: (
+          <Suspense fallback={<div>Loading...</div>}>
+            <Article />
+          </Suspense>
+        ),
       },
     ],
   },
 ]);
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <RouterProvider router={router} />
-      <ReactQueryDevtools/>
+      <ReactQueryDevtools />
     </QueryClientProvider>
   );
 }
