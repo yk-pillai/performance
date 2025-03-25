@@ -157,7 +157,7 @@ const ArticleList = () => {
           <div className="flex gap-4 h-44">
             <img
               alt={article.title}
-              src={`http://localhost:5000${article.image_url}`}
+              src={`${ASSETS_BACKEND_URL}${article.image_url}`}
               className="w-36 h-full rounded-lg shadow-md object-cover"
             />
             <div className="flex flex-col justify-between flex-1">

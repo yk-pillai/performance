@@ -1,7 +1,7 @@
 import { ArticleT } from "../types";
 import { useLocation, useOutletContext } from "react-router-dom";
 import HorizontalRule from "./HorizontalRule";
-import { API_BACKEND_URL } from "../constants";
+import { API_BACKEND_URL, ASSETS_BACKEND_URL } from "../constants";
 import BannerImage from "./BannerImage";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "../context/SessionContext";
@@ -283,7 +283,7 @@ const Article = () => {
       </div>
       <HorizontalRule />
       <BannerImage
-        imageUrl={`http://localhost:5000${article.image_url}`}
+        imageUrl={`${ASSETS_BACKEND_URL}${article.image_url}`}
         altTxt={article.image_url}
       />
       <div className="p-1 mt-4 font-tinos text-lg">{article.content}</div>
