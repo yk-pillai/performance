@@ -6,7 +6,6 @@ import { Category } from "../types";
 import { useQuery } from "@tanstack/react-query";
 
 async function getCategories() {
-  // await new Promise((resolve) => setTimeout(resolve, 1000));
   try {
     const response = await fetch(`${API_BACKEND_URL}/categories`,{
       credentials:'include'

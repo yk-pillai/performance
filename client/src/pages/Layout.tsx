@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { Suspense, lazy, useState } from "react";
 import { Outlet } from "react-router-dom";
 import Header from "../components/Header";
-import SignupModal from "../components/SignupModal";
-import LoginModal from "../components/LoginModal";
 import Title from "../components/Title";
 import { Toaster } from "react-hot-toast";
+
+const SignupModal = lazy(() => import("../components/SignupModal"));
+const LoginModal = lazy(() => import("../components/LoginModal"));
 
 function Layout() {
   const [showSignupModal, setShowSignupModal] = useState(false);
@@ -26,21 +27,25 @@ function Layout() {
 
   return (
     <div className="m-2">
-      <Toaster/>
+      <Toaster />
       <Header onLoginClick={() => setShowLoginModal(true)} />
-      <Title/>
+      <Title />
       <Outlet context={{ openLoginModal }} />
       {showSignupModal && (
-        <SignupModal
-          onClose={() => setShowSignupModal(false)}
-          onSwitchToLogin={handleSwitchToLogin}
-        />
+        <Suspense fallback="Sign up...">
+          <SignupModal
+            onClose={() => setShowSignupModal(false)}
+            onSwitchToLogin={handleSwitchToLogin}
+          />
+        </Suspense>
       )}
       {showLoginModal && (
-        <LoginModal
-          onClose={() => setShowLoginModal(false)}
-          onSwitchToSignup={handleSwitchToSignup}
-        />
+        <Suspense fallback="Log in...">
+          <LoginModal
+            onClose={() => setShowLoginModal(false)}
+            onSwitchToSignup={handleSwitchToSignup}
+          />
+        </Suspense>
       )}
     </div>
   );

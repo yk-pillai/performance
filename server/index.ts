@@ -6,9 +6,15 @@ import cors from "cors";
 import path from "path";
 import cookieParser from "cookie-parser";
 import { initializeRedisClient } from "./redisClient";
+import compression from "compression";
 // import { setupSessionMiddleware } from "./middlewares/sessionMiddleware";
 
 const app = express();
+
+app.use(compression({
+  br: { quality: 11 }, // Enable Brotli compression with maximum quality
+  gzip: false // Disable gzip, if you want to use brotli only.
+}));
 
 async function startServer() {
   await initializeRedisClient()
@@ -21,6 +27,7 @@ async function startServer() {
       origin: [
         "http://localhost:3000",
         "http://127.0.0.1:8080",
+        "http://localhost:8080",
         "https://yedhukrishnan.com",
       ],
       credentials: true,
@@ -32,9 +39,15 @@ async function startServer() {
 
   // Static files middleware
   if (process.env.NODE_ENV === "development") {
-    app.use("/images", express.static(path.join(__dirname, "images")));
+    app.use("/images", express.static(path.join(__dirname, "images"), {
+      maxAge: '365d', // Cache for 1 year (in milliseconds: 31536000000)
+      immutable: true
+    }));
   } else {
-    app.use("/images", express.static(path.join(__dirname, "..", "images")));
+    app.use("/images", express.static(path.join(__dirname, "..", "images"), {
+      maxAge: '365d', // Cache for 1 year (in milliseconds: 31536000000)
+      immutable: true
+    }));
   }
   app.use(cookieParser());
 
