@@ -70,3 +70,16 @@ export function preloadImage(imageUrl: string) {
   }
   return () => {};
 }
+
+export function preconnectServer(server: string) {
+  if (server) {
+    const link = document.createElement("link");
+    link.rel = "preconnect";
+    link.href = server;
+    document.head.appendChild(link);
+    return () => {
+      document.head.removeChild(link);
+    };
+  }
+  return () => {};
+}

@@ -2,8 +2,10 @@ import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import Layout from "./pages/Layout";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import CategoryList from "./components/CategoryList";
+import { preconnectServer } from "./utils";
+import { ASSETS_BACKEND_URL } from "./constants";
 
 // Dynamically load components
 const ArticleList = lazy(() => import("./components/ArticleList"));
@@ -40,6 +42,10 @@ const router = createBrowserRouter([
 ]);
 
 function App() {
+  useEffect(()=>{
+    const cleanup = preconnectServer(ASSETS_BACKEND_URL)
+    return cleanup;
+  },[])
   return (
     <QueryClientProvider client={queryClient}>
       <RouterProvider router={router} />
